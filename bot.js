@@ -106,6 +106,30 @@ function jobConfirmKeyboard(jobKey) {
     ]);
 }
 
+const BITRIX_WEBHOOK = 'https://b24-hjgutj.bitrix24.ru/rest/1/uly0yxxwby5qitzv';
+
+async function sendToBitrix(data, job) {
+    const url = `${BITRIX_WEBHOOK}/crm.lead.add`;
+    const fields = {
+        TITLE: `${job?.title || data.selectedJob} — ${data.fio}`,
+        NAME: data.fio,
+        PHONE: [{VALUE: data.phone, VALUE_TYPE: 'WORK'}],
+        SOURCE_ID: 'WEB',
+        COMMENTS:
+            `Вакансия: ${job?.title || data.selectedJob}\n` +
+            `ФИО: ${data.fio}\n` +
+            `Город: ${data.city}\n` +
+            `Возраст: ${data.age}\n` +
+            `Гражданство: ${data.citizenship}`,
+    };
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({fields}),
+    });
+    return res.json();
+}
+
 // Главное меню
 async function showMenu(ctx) {
     const userId = ctx.user.user_id;
@@ -191,6 +215,15 @@ bot.on('message_created', async (ctx) => {
         case 'citizenship': {
             const data = {...state, citizenship: text, step: 'done'};
             setState(userId, data);
+
+            // Илова кардан ба Bitrix
+            const job = JOBS[data.selectedJob];
+            try {
+                await sendToBitrix(data, job);
+                console.log('Заявка отправлена в Bitrix24');
+            } catch (e) {
+                console.error('Ошибка отправки в Bitrix:', e.message);
+            }
 
             await ctx.reply(
                 '🎉 Анкета заполнена! 🎉\n\n' +
