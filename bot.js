@@ -162,6 +162,27 @@ for (const [jobKey, job] of Object.entries(JOBS)) {
 
     bot.action(`confirm_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
+        setState(userId, {step: 'consent', selectedJob: jobKey});
+        await ctx.reply(
+            '🔒 Ваши данные под защитой\n\n' +
+            'Мы обрабатываем ваши персональные данные в соответствии с Федеральным законом №152-ФЗ «О персональных данных».\n\n' +
+            'Перед началом, пожалуйста, ознакомьтесь с нашими документами:\n\n' +
+            '📄 [Политика конфиденциальности](https://disk.yandex.ru/d/k4c4N8dtZSYhBQ)\n' +
+            '✍️ [Согласие на обработку данных](https://disk.yandex.ru/d/k4c4N8dtZSYhBQ)\n\n' +
+            'Мы используем ваши данные только для указанных целей и обеспечиваем их безопасность. Вы можете запросить удаление или изменение своих данных в любой момент.',
+            {
+                attachments: [
+                    Keyboard.inlineKeyboard([
+                        [Keyboard.button.callback('Ознакомлен и согласен!', `consent_ok_${jobKey}`)],
+                        [Keyboard.button.callback('◀ Назад', 'menu')],
+                    ]),
+                ],
+            }
+        );
+    });
+
+    bot.action(`consent_ok_${jobKey}`, async (ctx) => {
+        const userId = ctx.user.user_id;
         setState(userId, {step: 'fio', selectedJob: jobKey});
         await ctx.reply('Введите ваши Фамилию, Имя и Отчество 👇', {
             attachments: [menuKeyboard],
@@ -225,11 +246,34 @@ bot.on('message_created', async (ctx) => {
                 console.error('Ошибка отправки в Bitrix:', e.message);
             }
 
+
+
             await ctx.reply(
                 '🎉 Анкета заполнена! 🎉\n\n' +
                 'Спасибо, что потратили время! Мы уже отправили вашу информацию в нужные руки, ' +
                 'и совсем скоро с вами свяжется наш менеджер, чтобы обсудить все детали. 📞\n\n' +
-                'Будьте готовы к интересным предложениям — мы скоро на связи! 😎'
+                'Будьте готовы к интересным предложениям — мы скоро на связи! 😎',
+                {
+                    attachments: [
+                        Keyboard.inlineKeyboard([
+                            [Keyboard.button.callback('Вступить в группу', 'group_link')],
+                        ]),
+                    ],
+                }
+            );
+
+            // Сообщение о необходимости подписки на канал
+            await ctx.reply(
+                '🥲 Вы не подписались на канал!\n\n' +
+                '☺️ Для доступа к боту нужно подписаться на канал ПРОСТО РАБОТА',
+                {
+                    attachments: [
+                        Keyboard.inlineKeyboard([
+                            [Keyboard.button.callback('✅ Подписаться', 'group_link')],
+                            [Keyboard.button.callback('👀 Проверить подписку', 'check_subscription')],
+                        ]),
+                    ],
+                }
             );
 
             // Уведомление админу
@@ -260,6 +304,11 @@ bot.on('message_created', async (ctx) => {
         default:
             await showMenu(ctx);
     }
+});
+
+// Обработчик для кнопки "Вступить в группу" и "Подписаться"
+bot.action('group_link', async (ctx) => {
+    await ctx.reply('Ссылка на группу: https://max.ru/prostorabotaru');
 });
 
 bot.start();
