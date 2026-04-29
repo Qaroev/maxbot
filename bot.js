@@ -110,6 +110,11 @@ const BITRIX_WEBHOOK = 'https://b24-hjgutj.bitrix24.ru/rest/1/uly0yxxwby5qitzv';
 
 async function sendToBitrix(data, job) {
     const url = `${BITRIX_WEBHOOK}/crm.lead.add`;
+    console.log(`Вакансия: ${job?.title || data.selectedJob}\n` +
+        `ФИО: ${data.fio}\n` +
+        `Город: ${data.city}\n` +
+        `Возраст: ${data.age}\n` +
+        `Гражданство: ${data.citizenship}`);
     const fields = {
         TITLE: `${job?.title || data.selectedJob} — ${data.fio}`,
         NAME: data.fio,
@@ -239,13 +244,13 @@ bot.on('message_created', async (ctx) => {
 
             // Илова кардан ба Bitrix
             const job = JOBS[data.selectedJob];
+            console.log('job', job);
             try {
                 await sendToBitrix(data, job);
                 console.log('Заявка отправлена в Bitrix24');
             } catch (e) {
                 console.error('Ошибка отправки в Bitrix:', e.message);
             }
-
 
 
             await ctx.reply(
