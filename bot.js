@@ -2,10 +2,17 @@ import 'dotenv/config';
 import {Bot, Keyboard} from '@maxhub/max-bot-api';
 
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
-const ADMIN_ID = Number("12564804");
+const ADMIN_ID = Number("75038254"); //  12564804 75038254
 
 // Хранилище состояний пользователей
 const states = new Map();
+
+// Хранилище всех пользователей
+const users = new Set();
+
+function trackUser(userId) {
+    users.add(userId);
+}
 
 function getState(userId) {
     return states.get(userId) || {step: 'idle'};
@@ -84,15 +91,34 @@ const JOBS = {
 };
 
 // Клавиатуры
-const jobKeyboard = Keyboard.inlineKeyboard([
-    [
-        Keyboard.button.callback('🚶 Пеший курьер', 'job_foot_courier'),
-        Keyboard.button.callback('🚴 Велокурьер', 'job_bike_courier'),
-    ],
-    [
-        Keyboard.button.callback('🚗 Автокурьер', 'job_auto_courier'),
-        Keyboard.button.callback('📦 Сборщик заказов', 'job_picker'),
-    ],
+function getJobKeyboard(userId) {
+    const rows = [
+        [
+            Keyboard.button.callback('🚶 Пеший курьер', 'job_foot_courier'),
+            Keyboard.button.callback('🚴 Велокурьер', 'job_bike_courier'),
+        ],
+        [
+            Keyboard.button.callback('🚗 Автокурьер', 'job_auto_courier'),
+            Keyboard.button.callback('📦 Сборщик заказов', 'job_picker'),
+        ],
+    ];
+    if (userId === ADMIN_ID) {
+        rows.push([Keyboard.button.callback('⚙️ Админ-панель', 'admin_panel')]);
+    }
+    return Keyboard.inlineKeyboard(rows);
+}
+
+const adminKeyboard = Keyboard.inlineKeyboard([
+    [Keyboard.button.callback('📊 Статистика', 'admin_stats')],
+    [Keyboard.button.callback('📢 Рассылка', 'admin_broadcast')],
+    [Keyboard.button.callback('🏠 В меню', 'menu')],
+]);
+
+const broadcastTypeKeyboard = Keyboard.inlineKeyboard([
+    [Keyboard.button.callback('Текст', 'broadcast_text')],
+    [Keyboard.button.callback('Фото + текст', 'broadcast_photo')],
+    [Keyboard.button.callback('Видео + текст', 'broadcast_video')],
+    [Keyboard.button.callback('◀ Назад', 'admin_panel')],
 ]);
 
 const menuKeyboard = Keyboard.inlineKeyboard([
@@ -138,12 +164,13 @@ async function sendToBitrix(data, job) {
 // Главное меню
 async function showMenu(ctx) {
     const userId = ctx.user.user_id;
+    trackUser(userId);
     setState(userId, {step: 'idle'});
     await ctx.reply(
         'Мы очень рады, что ты хочешь сотрудничать! 🤝\n\n' +
         '🎯 Давай выберем подходящую вакансию и начнём вместе зарабатывать:\n\n' +
         '👇 Выбирай, кем хочешь работать:',
-        {attachments: [jobKeyboard]}
+        {attachments: [getJobKeyboard(userId)]}
     );
 }
 
@@ -155,6 +182,68 @@ bot.command('start', async (ctx) => {
 // Кнопка "Меню"
 bot.action('menu', async (ctx) => {
     await showMenu(ctx);
+});
+
+// Админ-панель
+bot.action('admin_panel', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    setState(userId, {step: 'idle'});
+    await ctx.reply(
+        'Добро пожаловать в админ-панель!\n\nВы можете посмотреть всех пользователей или сделать рассылку, **что выберете?**',
+        {attachments: [adminKeyboard]}
+    );
+});
+
+// Статистика
+bot.action('admin_stats', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    const total = users.size;
+    await ctx.reply(
+        `📊 Статистика\n\n👥 Всего пользователей: ${total}`,
+        {attachments: [adminKeyboard]}
+    );
+});
+
+// Рассылка — выбор типа
+bot.action('admin_broadcast', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    await ctx.reply(
+        'Выберите, какую именно рассылку вы хотите запустить:',
+        {attachments: [broadcastTypeKeyboard]}
+    );
+});
+
+// Рассылка — текст
+bot.action('broadcast_text', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    setState(userId, {step: 'admin_broadcast_text'});
+    await ctx.reply('Введите текст для рассылки 👇', {
+        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_broadcast')]])],
+    });
+});
+
+// Рассылка — фото + текст
+bot.action('broadcast_photo', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    setState(userId, {step: 'admin_broadcast_photo'});
+    await ctx.reply('Отправьте фото с подписью (или без) 👇', {
+        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_broadcast')]])],
+    });
+});
+
+// Рассылка — видео + текст
+bot.action('broadcast_video', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    setState(userId, {step: 'admin_broadcast_video'});
+    await ctx.reply('Отправьте видео с подписью (или без) 👇', {
+        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_broadcast')]])],
+    });
 });
 
 // Выбор вакансии
@@ -197,16 +286,108 @@ for (const [jobKey, job] of Object.entries(JOBS)) {
 
 bot.on('bot_started', async (ctx) => {
     console.log('bot_started');
+    console.log('Your ID:', ctx.user.user_id);
     await showMenu(ctx);
 });
 
 // Обработка сообщений — шаги анкеты
 bot.on('message_created', async (ctx) => {
     const userId = ctx.user.user_id;
+    trackUser(userId);
     const text = ctx.message?.body?.text;
-    if (!text) return;
-
     const state = getState(userId);
+
+    // Рассылка: текст
+    if (state.step === 'admin_broadcast_text') {
+        if (!text) {
+            await ctx.reply('Пожалуйста, отправьте текстовое сообщение.');
+            return;
+        }
+        setState(userId, {step: 'idle'});
+        let sent = 0, failed = 0;
+        for (const uid of users) {
+            if (uid === ADMIN_ID) continue;
+            try {
+                await bot.api.sendMessage({
+                    recipient: {userId: uid},
+                    body: {type: 'text', text},
+                });
+                sent++;
+            } catch {
+                failed++;
+            }
+        }
+        await ctx.reply(`✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`, {
+            attachments: [adminKeyboard],
+        });
+        return;
+    }
+
+    // Рассылка: фото + текст
+    if (state.step === 'admin_broadcast_photo') {
+        const attachments = ctx.message?.body?.attachments || [];
+        const photo = attachments.find(a => a.type === 'image');
+        if (!photo) {
+            await ctx.reply('Пожалуйста, отправьте фото.');
+            return;
+        }
+        setState(userId, {step: 'idle'});
+        let sent = 0, failed = 0;
+        for (const uid of users) {
+            if (uid === ADMIN_ID) continue;
+            try {
+                await bot.api.sendMessage({
+                    recipient: {userId: uid},
+                    body: {
+                        type: 'text',
+                        text: text || '',
+                        attachments: [{type: 'image', payload: {token: photo.payload.token}}],
+                    },
+                });
+                sent++;
+            } catch {
+                failed++;
+            }
+        }
+        await ctx.reply(`✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`, {
+            attachments: [adminKeyboard],
+        });
+        return;
+    }
+
+    // Рассылка: видео + текст
+    if (state.step === 'admin_broadcast_video') {
+        const attachments = ctx.message?.body?.attachments || [];
+        const video = attachments.find(a => a.type === 'video');
+        if (!video) {
+            await ctx.reply('Пожалуйста, отправьте видео.');
+            return;
+        }
+        setState(userId, {step: 'idle'});
+        let sent = 0, failed = 0;
+        for (const uid of users) {
+            if (uid === ADMIN_ID) continue;
+            try {
+                await bot.api.sendMessage({
+                    recipient: {userId: uid},
+                    body: {
+                        type: 'text',
+                        text: text || '',
+                        attachments: [{type: 'video', payload: {token: video.payload.token}}],
+                    },
+                });
+                sent++;
+            } catch {
+                failed++;
+            }
+        }
+        await ctx.reply(`✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`, {
+            attachments: [adminKeyboard],
+        });
+        return;
+    }
+
+    if (!text) return;
 
     switch (state.step) {
         case 'fio':
