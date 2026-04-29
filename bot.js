@@ -2,7 +2,7 @@ import 'dotenv/config';
 import {Bot, Keyboard} from '@maxhub/max-bot-api';
 
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
-const ADMIN_ID = Number("75038254"); //  12564804 75038254
+const ADMIN_ID = Number("203379794"); //  12564804 75038254 
 
 // Хранилище состояний пользователей
 const states = new Map();
@@ -308,12 +308,10 @@ bot.on('message_created', async (ctx) => {
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessage({
-                    recipient: {userId: uid},
-                    body: {type: 'text', text},
-                });
+                await bot.api.sendMessageToUser(uid, text);
                 sent++;
-            } catch {
+            } catch (e) {
+                console.error('broadcast text error:', uid, e.message);
                 failed++;
             }
         }
@@ -336,16 +334,12 @@ bot.on('message_created', async (ctx) => {
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessage({
-                    recipient: {userId: uid},
-                    body: {
-                        type: 'text',
-                        text: text || '',
-                        attachments: [{type: 'image', payload: {token: photo.payload.token}}],
-                    },
+                await bot.api.sendMessageToUser(uid, text || '', {
+                    attachments: [{type: 'image', payload: {token: photo.payload.token}}],
                 });
                 sent++;
-            } catch {
+            } catch (e) {
+                console.error('broadcast photo error:', uid, e.message);
                 failed++;
             }
         }
@@ -368,16 +362,12 @@ bot.on('message_created', async (ctx) => {
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessage({
-                    recipient: {userId: uid},
-                    body: {
-                        type: 'text',
-                        text: text || '',
-                        attachments: [{type: 'video', payload: {token: video.payload.token}}],
-                    },
+                await bot.api.sendMessageToUser(uid, text || '', {
+                    attachments: [{type: 'video', payload: {token: video.payload.token}}],
                 });
                 sent++;
-            } catch {
+            } catch (e) {
+                console.error('broadcast video error:', uid, e.message);
                 failed++;
             }
         }
@@ -442,7 +432,7 @@ bot.on('message_created', async (ctx) => {
                 {
                     attachments: [
                         Keyboard.inlineKeyboard([
-                            [Keyboard.button.callback('Вступить в группу', 'group_link')],
+                            [Keyboard.button.link('Вступить в группу', 'https://max.ru/prostorabotaru')],
                         ]),
                     ],
                 }
@@ -455,7 +445,7 @@ bot.on('message_created', async (ctx) => {
                 {
                     attachments: [
                         Keyboard.inlineKeyboard([
-                            [Keyboard.button.callback('✅ Подписаться', 'group_link')],
+                            [Keyboard.button.link('✅ Подписаться', 'https://max.ru/prostorabotaru')],
                             [Keyboard.button.callback('👀 Проверить подписку', 'check_subscription')],
                         ]),
                     ],
@@ -492,9 +482,5 @@ bot.on('message_created', async (ctx) => {
     }
 });
 
-// Обработчик для кнопки "Вступить в группу" и "Подписаться"
-bot.action('group_link', async (ctx) => {
-    await ctx.reply('Ссылка на группу: https://max.ru/prostorabotaru');
-});
 
 bot.start();
