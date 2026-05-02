@@ -2,7 +2,7 @@ import 'dotenv/config';
 import {Bot, Keyboard} from '@maxhub/max-bot-api';
 
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
-const ADMIN_ID = Number("203379794"); //  12564804 75038254 
+const ADMIN_ID = Number("75038254"); //  12564804   203379794
 
 // Хранилище состояний пользователей
 const states = new Map();
@@ -136,18 +136,25 @@ const BITRIX_WEBHOOK = 'https://b24-hjgutj.bitrix24.ru/rest/1/uly0yxxwby5qitzv';
 
 async function sendToBitrix(data, job) {
     const url = `${BITRIX_WEBHOOK}/crm.lead.add`;
-    console.log(`Вакансия: ${job?.title || data.selectedJob}\n` +
-        `ФИО: ${data.fio}\n` +
-        `Город: ${data.city}\n` +
-        `Возраст: ${data.age}\n` +
-        `Гражданство: ${data.citizenship}`);
+    const jobTitle = job?.title || data.selectedJob || '—';
+    console.log('Отправка в Bitrix:', {
+        fio: data.fio,
+        phone: data.phone,
+        city: data.city,
+        age: data.age,
+        citizenship: data.citizenship,
+        job: jobTitle,
+    });
     const fields = {
-        TITLE: `${job?.title || data.selectedJob} — ${data.fio}`,
+        TITLE: `${jobTitle} — ${data.fio}`,
         NAME: data.fio,
         PHONE: [{VALUE: data.phone, VALUE_TYPE: 'WORK'}],
         SOURCE_ID: 'WEB',
+        SOURCE_DESCRIPTION: `Бот Макс Купер | Вакансия: ${jobTitle} | Возраст: ${data.age} | Гражданство: ${data.citizenship}`,
+        ADDRESS_CITY: data.city,
         COMMENTS:
-            `Вакансия: ${job?.title || data.selectedJob}\n` +
+            `Источник: Бот Макс Купер\n` +
+            `Вакансия: ${jobTitle}\n` +
             `ФИО: ${data.fio}\n` +
             `Город: ${data.city}\n` +
             `Возраст: ${data.age}\n` +
@@ -158,7 +165,13 @@ async function sendToBitrix(data, job) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({fields}),
     });
-    return res.json();
+    const result = await res.json();
+    if (result.error) {
+        console.error('Bitrix error:', result.error, result.error_description);
+    } else {
+        console.log('Bitrix лид создан, ID:', result.result);
+    }
+    return result;
 }
 
 // Главное меню
@@ -304,11 +317,23 @@ bot.on('message_created', async (ctx) => {
             return;
         }
         setState(userId, {step: 'idle'});
+
+        // Ссылкаро аз матн мегирем
+        const urlMatch = text.match(/https?:\/\/[^\s)]+/);
+        const cleanText = text.replace(/\(https?:\/\/[^\s)]+\)/g, '').replace(/https?:\/\/[^\s)]+/g, '').trim();
+
         let sent = 0, failed = 0;
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessageToUser(uid, text);
+                await bot.api.sendMessageToUser(uid, cleanText);
+                if (urlMatch) {
+                    await bot.api.sendMessage({
+                        recipient: {userId: uid},
+                        body: {type: 'text', text: '👉 Перейти по ссылке'},
+                        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.link('👉 Перейти по ссылке', urlMatch[0])]])],
+                    });
+                }
                 sent++;
             } catch (e) {
                 console.error('broadcast text error:', uid, e.message);
