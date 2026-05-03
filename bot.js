@@ -1,17 +1,36 @@
 import 'dotenv/config';
 import {Bot, Keyboard} from '@maxhub/max-bot-api';
+import fs from 'fs';
 
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
-const ADMIN_ID = Number("75038254"); //  12564804   203379794
+const ADMIN_ID = Number("203379794");  //  12564804   203379794. 75038254
+
+const USERS_FILE = './users.json';
+
+function loadUsers() {
+    try {
+        const data = fs.readFileSync(USERS_FILE, 'utf8');
+        return new Set(JSON.parse(data));
+    } catch {
+        return new Set();
+    }
+}
+
+function saveUsers() {
+    fs.writeFileSync(USERS_FILE, JSON.stringify([...users]));
+}
 
 // Хранилище состояний пользователей
 const states = new Map();
 
 // Хранилище всех пользователей
-const users = new Set();
+const users = loadUsers();
 
 function trackUser(userId) {
-    users.add(userId);
+    if (!users.has(userId)) {
+        users.add(userId);
+        saveUsers();
+    }
 }
 
 function getState(userId) {
@@ -324,21 +343,39 @@ bot.on('message_created', async (ctx) => {
         }
         setState(userId, {step: 'idle'});
 
-        // Ссылкаро аз матн мегирем
-        const urlMatch = text.match(/https?:\/\/[^\s)]+/);
-        const cleanText = text.replace(/\(https?:\/\/[^\s)]+\)/g, '').replace(/https?:\/\/[^\s)]+/g, '').trim();
+        const markup = ctx.message?.body?.markup || [];
+        const linkMarkups = markup.filter(m => m.type === 'link' && m.url);
+        const firstLink = linkMarkups[0];
+
+        let btnUrl = null;
+        let btnText = '👉 Перейти по ссылке';
+        let cleanText = text;
+
+        if (firstLink) {
+            btnUrl = firstLink.url;
+            const allSameUrl = linkMarkups.filter(m => m.url === btnUrl);
+            const minFrom = Math.min(...allSameUrl.map(m => m.from));
+            const maxTo = Math.max(...allSameUrl.map(m => m.from + m.length));
+            btnText = text.substring(minFrom, maxTo).trim() || btnText;
+            cleanText = (text.substring(0, minFrom) + text.substring(maxTo)).trim();
+        } else {
+            const urlMatch = text.match(/https?:\/\/[^\s]+/);
+            if (urlMatch) {
+                btnUrl = urlMatch[0];
+                cleanText = text.replace(urlMatch[0], '').trim();
+            }
+        }
 
         let sent = 0, failed = 0;
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessageToUser(uid, cleanText);
-                if (urlMatch) {
-                    await bot.api.sendMessage({
-                        recipient: {userId: uid},
-                        body: {type: 'text', text: '👉 Перейти по ссылке'},
-                        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.link('👉 Перейти по ссылке', urlMatch[0])]])],
+                if (btnUrl) {
+                    await bot.api.sendMessageToUser(uid, cleanText, {
+                        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.link(btnText, btnUrl)]])],
                     });
+                } else {
+                    await bot.api.sendMessageToUser(uid, text);
                 }
                 sent++;
             } catch (e) {
@@ -497,10 +534,7 @@ bot.on('message_created', async (ctx) => {
                     `🌍 Гражданство: ${data.citizenship}`;
 
                 try {
-                    await bot.api.sendMessage({
-                        recipient: {userId: ADMIN_ID},
-                        body: {type: 'text', text: summary},
-                    });
+                    await bot.api.sendMessageToUser(ADMIN_ID, summary);
                 } catch (e) {
                     console.error('Ошибка отправки админу:', e.message);
                 }
