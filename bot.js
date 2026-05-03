@@ -136,7 +136,7 @@ const BITRIX_WEBHOOK = 'https://b24-hjgutj.bitrix24.ru/rest/1/uly0yxxwby5qitzv';
 
 async function sendToBitrix(data, job) {
     const url = `${BITRIX_WEBHOOK}/crm.lead.add`;
-    const jobTitle = job?.title || data.selectedJob || '—';
+    const jobTitle = (job?.title || data.selectedJob || '—').replace(/[\u{1F000}-\u{1FFFF}]/gu, '').trim();
     console.log('Отправка в Bitrix:', {
         fio: data.fio,
         phone: data.phone,
@@ -149,8 +149,8 @@ async function sendToBitrix(data, job) {
         TITLE: `${jobTitle} — ${data.fio}`,
         NAME: data.fio,
         PHONE: [{VALUE: data.phone, VALUE_TYPE: 'WORK'}],
-        SOURCE_ID: 'WEB',
-        SOURCE_DESCRIPTION: `Бот Макс Купер | Вакансия: ${jobTitle} | Возраст: ${data.age} | Гражданство: ${data.citizenship}`,
+        SOURCE_ID: 'OTHER',
+        SOURCE_DESCRIPTION: 'Бот Макс Купер',
         ADDRESS_CITY: data.city,
         COMMENTS:
             `Источник: Бот Макс Купер\n` +
@@ -159,6 +159,12 @@ async function sendToBitrix(data, job) {
             `Город: ${data.city}\n` +
             `Возраст: ${data.age}\n` +
             `Гражданство: ${data.citizenship}`,
+        UF_CRM_1777750252: jobTitle,
+        UF_CRM_1777750300: data.age,
+        UF_CRM_1777750316: data.citizenship,
+        UF_CRM_1777750988: data.fio,
+        UF_CRM_1777750997: data.city,
+        UF_CRM_1777751018: 'Бот Макс Купер',
     };
     const res = await fetch(url, {
         method: 'POST',
