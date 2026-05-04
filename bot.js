@@ -3,7 +3,7 @@ import {Bot, Keyboard} from '@maxhub/max-bot-api';
 import fs from 'fs';
 
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
-const ADMIN_ID = Number("203379794");  //  12564804   203379794. 75038254
+const ADMIN_ID = Number("75038254");  //  12564804   203379794. 
 
 const USERS_FILE = './users.json';
 
@@ -149,6 +149,26 @@ function jobConfirmKeyboard(jobKey) {
         [Keyboard.button.callback('Согласен, продолжить ▶', `confirm_${jobKey}`)],
         [Keyboard.button.callback('◀ Назад', 'menu')],
     ]);
+}
+
+function extractLink(body, text) {
+    const markup = body?.markup || [];
+    const linkMarkups = markup.filter(m => m.type === 'link' && m.url);
+    const firstLink = linkMarkups[0];
+    if (firstLink) {
+        const btnUrl = firstLink.url;
+        const allSameUrl = linkMarkups.filter(m => m.url === btnUrl);
+        const minFrom = Math.min(...allSameUrl.map(m => m.from));
+        const maxTo = Math.max(...allSameUrl.map(m => m.from + m.length));
+        const btnText = text.substring(minFrom, maxTo).trim() || '👉 Перейти по ссылке';
+        const cleanText = (text.substring(0, minFrom) + text.substring(maxTo)).trim();
+        return {btnUrl, btnText, cleanText};
+    }
+    const urlMatch = text?.match(/https?:\/\/[^\s]+/);
+    if (urlMatch) {
+        return {btnUrl: urlMatch[0], btnText: '👉 Перейти по ссылке', cleanText: text.replace(urlMatch[0], '').trim()};
+    }
+    return {btnUrl: null, btnText: null, cleanText: text};
 }
 
 const BITRIX_WEBHOOK = 'https://b24-hjgutj.bitrix24.ru/rest/1/uly0yxxwby5qitzv';
@@ -343,28 +363,7 @@ bot.on('message_created', async (ctx) => {
         }
         setState(userId, {step: 'idle'});
 
-        const markup = ctx.message?.body?.markup || [];
-        const linkMarkups = markup.filter(m => m.type === 'link' && m.url);
-        const firstLink = linkMarkups[0];
-
-        let btnUrl = null;
-        let btnText = '👉 Перейти по ссылке';
-        let cleanText = text;
-
-        if (firstLink) {
-            btnUrl = firstLink.url;
-            const allSameUrl = linkMarkups.filter(m => m.url === btnUrl);
-            const minFrom = Math.min(...allSameUrl.map(m => m.from));
-            const maxTo = Math.max(...allSameUrl.map(m => m.from + m.length));
-            btnText = text.substring(minFrom, maxTo).trim() || btnText;
-            cleanText = (text.substring(0, minFrom) + text.substring(maxTo)).trim();
-        } else {
-            const urlMatch = text.match(/https?:\/\/[^\s]+/);
-            if (urlMatch) {
-                btnUrl = urlMatch[0];
-                cleanText = text.replace(urlMatch[0], '').trim();
-            }
-        }
+        const { btnUrl, btnText, cleanText } = extractLink(ctx.message?.body, text);
 
         let sent = 0, failed = 0;
         for (const uid of users) {
@@ -398,13 +397,14 @@ bot.on('message_created', async (ctx) => {
             return;
         }
         setState(userId, {step: 'idle'});
+        const { btnUrl: photoBtnUrl, btnText: photoBtnText, cleanText: photoCleanText } = extractLink(ctx.message?.body, text);
         let sent = 0, failed = 0;
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessageToUser(uid, text || '', {
-                    attachments: [{type: 'image', payload: {token: photo.payload.token}}],
-                });
+                const msgAttachments = [{type: 'image', payload: {token: photo.payload.token}}];
+                if (photoBtnUrl) msgAttachments.push(Keyboard.inlineKeyboard([[Keyboard.button.link(photoBtnText, photoBtnUrl)]]));
+                await bot.api.sendMessageToUser(uid, photoCleanText || '', {attachments: msgAttachments});
                 sent++;
             } catch (e) {
                 console.error('broadcast photo error:', uid, e.message);
@@ -426,13 +426,14 @@ bot.on('message_created', async (ctx) => {
             return;
         }
         setState(userId, {step: 'idle'});
+        const { btnUrl: videoBtnUrl, btnText: videoBtnText, cleanText: videoCleanText } = extractLink(ctx.message?.body, text);
         let sent = 0, failed = 0;
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessageToUser(uid, text || '', {
-                    attachments: [{type: 'video', payload: {token: video.payload.token}}],
-                });
+                const msgAttachments = [{type: 'video', payload: {token: video.payload.token}}];
+                if (videoBtnUrl) msgAttachments.push(Keyboard.inlineKeyboard([[Keyboard.button.link(videoBtnText, videoBtnUrl)]]));
+                await bot.api.sendMessageToUser(uid, videoCleanText || '', {attachments: msgAttachments});
                 sent++;
             } catch (e) {
                 console.error('broadcast video error:', uid, e.message);
