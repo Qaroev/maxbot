@@ -492,7 +492,6 @@ bot.on('message_created', async (ctx) => {
                 console.error('Ошибка отправки в Bitrix:', e.message);
             }
 
-
             await ctx.reply(
                 '🎉 Анкета заполнена! 🎉\n\n' +
                 'Спасибо, что потратили время! Мы уже отправили вашу информацию в нужные руки, ' +
@@ -507,7 +506,8 @@ bot.on('message_created', async (ctx) => {
                 }
             );
 
-            // Сообщение о необходимости подписки на канал
+            await new Promise(resolve => setTimeout(resolve, 60000));
+
             await ctx.reply(
                 '🥲 Вы не подписались на канал!\n\n' +
                 '☺️ Для доступа к боту нужно подписаться на канал ПРОСТО РАБОТА',
@@ -520,6 +520,11 @@ bot.on('message_created', async (ctx) => {
                     ],
                 }
             );
+
+            await new Promise(resolve => setTimeout(resolve, 60000));
+
+            await showMenu(ctx);
+            break;
         }
 
         default:
