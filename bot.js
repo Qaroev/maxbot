@@ -520,27 +520,6 @@ bot.on('message_created', async (ctx) => {
                     ],
                 }
             );
-
-            // Уведомление админу
-            if (ADMIN_ID) {
-                const job = JOBS[data.selectedJob];
-                const summary =
-                    `📋 Новая заявка!\n\n` +
-                    `👤 Пользователь: ${ctx.user.name} (ID: ${userId})\n` +
-                    `💼 Вакансия: ${job?.title || data.selectedJob}\n` +
-                    `👨‍💼 ФИО: ${data.fio}\n` +
-                    `🏙️ Город: ${data.city}\n` +
-                    `📱 Телефон: ${data.phone}\n` +
-                    `🎂 Возраст: ${data.age}\n` +
-                    `🌍 Гражданство: ${data.citizenship}`;
-
-                try {
-                    await bot.api.sendMessageToUser(ADMIN_ID, summary);
-                } catch (e) {
-                    console.error('Ошибка отправки админу:', e.message);
-                }
-            }
-            break;
         }
 
         default:
