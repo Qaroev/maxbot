@@ -98,7 +98,7 @@ const BITRIX_WEBHOOK = process.env.BITRIX_WEBHOOK || 'https://b24-hjgutj.bitrix2
 
 async function sendToBitrix(data, job) {
     const url = `${BITRIX_WEBHOOK}/crm.lead.add`;
-    const jobTitle = (job?.title || data.selectedJob || '—').replace(/[\u{1F000}-\u{1FFFF}]/gu, '').trim();
+    const jobTitle = ((job && job.title) || data.selectedJob || '—').replace(/[\u{1F000}-\u{1FFFF}]/gu, '').trim();
     console.log('Отправка в Bitrix:', {
         fio: data.fio,
         phone: data.phone,
@@ -307,7 +307,7 @@ bot.action('admin_broadcast', async (ctx) => {
 bot.on('message_created', async (ctx) => {
     const userId = ctx.user.user_id;
     trackUser(userId);
-    const text = ctx.message?.body?.text;
+    const text = ctx.message && ctx.message.body && ctx.message.body.text;
     const state = getState(userId);
 
     // Рассылка
