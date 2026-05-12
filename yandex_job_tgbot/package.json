@@ -1,0 +1,12 @@
+{
+  "name": "yandex-job-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "@maxhub/max-bot-api": "latest",
+    "dotenv": "latest"
+  }
+}
