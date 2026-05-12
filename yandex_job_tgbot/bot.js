@@ -181,14 +181,17 @@ const adminKeyboard = Keyboard.inlineKeyboard([
 
 // ─── Главное меню ─────────────────────────────────────────────────────────────
 
-async function showMenu(ctx) {
+async function showMenu(ctx, edit = false) {
     const userId = ctx.user.user_id;
     trackUser(userId);
     setState(userId, { step: 'idle' });
-    await ctx.reply(
-        'У нас открыты несколько интересных вакансий 🔥\n\n🔍 Ищете работу? Выберите вакансию, которая вам подходит! 😊',
-        { attachments: [getJobKeyboard(userId)] }
-    );
+    const text = 'У нас открыты несколько интересных вакансий 🔥\n\n🔍 Ищете работу? Выберите вакансию, которая вам подходит! 😊';
+    const keyboard = getJobKeyboard(userId);
+    if (edit) {
+        await ctx.editMessage({ text, attachments: [keyboard] });
+    } else {
+        await ctx.reply(text, { attachments: [keyboard] });
+    }
 }
 
 // ─── /start и bot_started ─────────────────────────────────────────────────────
@@ -219,19 +222,19 @@ bot.on('bot_started', handleStart);
 // ─── Действия ─────────────────────────────────────────────────────────────────
 
 bot.action('self_register', async (ctx) => {
-    await showMenu(ctx);
+    await showMenu(ctx, true);
 });
 
 bot.action('contact_manager', async (ctx) => {
     const userId = ctx.user.user_id;
-    await ctx.reply(
-        'Наш менеджер свяжется с вами в ближайшее время! 📞\n\nПока вы ждёте — можете ознакомиться с нашими вакансиями 👇',
-        { attachments: [getJobKeyboard(userId)] }
-    );
+    await ctx.editMessage({
+        text: 'Наш менеджер свяжется с вами в ближайшее время! 📞\n\nПока вы ждёте — можете ознакомиться с нашими вакансиями 👇',
+        attachments: [getJobKeyboard(userId)],
+    });
 });
 
 bot.action('menu', async (ctx) => {
-    await showMenu(ctx);
+    await showMenu(ctx, true);
 });
 
 // ─── Вакансии ─────────────────────────────────────────────────────────────────
@@ -240,35 +243,32 @@ for (const [jobKey, job] of Object.entries(JOBS)) {
     bot.action(`job_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
         setState(userId, { step: 'viewing', selectedJob: jobKey });
-        await ctx.reply(job.description, { attachments: [jobConfirmKeyboard(jobKey)] });
+        await ctx.editMessage({ text: job.description, attachments: [jobConfirmKeyboard(jobKey)] });
     });
 
     bot.action(`confirm_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
         setState(userId, { step: 'consent', selectedJob: jobKey });
-        await ctx.reply(
-            '🔒 Ваши данные под защитой\n\n' +
-            'Мы обрабатываем ваши персональные данные в соответствии с Федеральным законом №152-ФЗ «О персональных данных».\n\n' +
-            'Перед началом, пожалуйста, ознакомьтесь с нашими документами:\n\n' +
-            '📄 [Политика конфиденциальности](https://disk.yandex.ru/d/k4c4N8dtZSYhBQ)\n' +
-            '✍️ [Согласие на обработку данных](https://disk.yandex.ru/d/k4c4N8dtZSYhBQ)',
-            {
-                attachments: [
-                    Keyboard.inlineKeyboard([
-                        [Keyboard.button.callback('Ознакомлен и согласен!', `consent_ok_${jobKey}`)],
-                        [Keyboard.button.callback('◀ Назад', 'menu')],
-                    ]),
-                ],
-            }
-        );
+        await ctx.editMessage({
+            text:
+                '🔒 Ваши данные под защитой\n\n' +
+                'Мы обрабатываем ваши персональные данные в соответствии с Федеральным законом №152-ФЗ «О персональных данных».\n\n' +
+                'Перед началом, пожалуйста, ознакомьтесь с нашими документами:\n\n' +
+                '📄 [Политика конфиденциальности](https://disk.yandex.ru/d/k4c4N8dtZSYhBQ)\n' +
+                '✍️ [Согласие на обработку данных](https://disk.yandex.ru/d/k4c4N8dtZSYhBQ)',
+            attachments: [
+                Keyboard.inlineKeyboard([
+                    [Keyboard.button.callback('Ознакомлен и согласен!', `consent_ok_${jobKey}`)],
+                    [Keyboard.button.callback('◀ Назад', 'menu')],
+                ]),
+            ],
+        });
     });
 
     bot.action(`consent_ok_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
+        await ctx.editMessage({ text: 'Введите ваши Фамилию, Имя и Отчество 👇', attachments: [menuKeyboard] });
         setState(userId, { step: 'fio', selectedJob: jobKey });
-        await ctx.reply('Введите ваши Фамилию, Имя и Отчество 👇', {
-            attachments: [menuKeyboard],
-        });
     });
 }
 
@@ -278,26 +278,27 @@ bot.action('admin_panel', async (ctx) => {
     const userId = ctx.user.user_id;
     if (userId !== ADMIN_ID) return;
     setState(userId, { step: 'idle' });
-    await ctx.reply(
-        'Добро пожаловать в админ-панель!\n\nВыберите действие:',
-        { attachments: [adminKeyboard] }
-    );
+    await ctx.editMessage({
+        text: 'Добро пожаловать в админ-панель!\n\nВыберите действие:',
+        attachments: [adminKeyboard],
+    });
 });
 
 bot.action('admin_stats', async (ctx) => {
     const userId = ctx.user.user_id;
     if (userId !== ADMIN_ID) return;
-    await ctx.reply(
-        `📊 Статистика\n\n👥 Всего пользователей: ${users.size}`,
-        { attachments: [adminKeyboard] }
-    );
+    await ctx.editMessage({
+        text: `📊 Статистика\n\n👥 Всего пользователей: ${users.size}`,
+        attachments: [adminKeyboard],
+    });
 });
 
 bot.action('admin_broadcast', async (ctx) => {
     const userId = ctx.user.user_id;
     if (userId !== ADMIN_ID) return;
     setState(userId, { step: 'admin_broadcast_text' });
-    await ctx.reply('Введите текст для рассылки 👇', {
+    await ctx.editMessage({
+        text: 'Введите текст для рассылки 👇',
         attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_panel')]])],
     });
 });
@@ -340,39 +341,34 @@ bot.on('message_created', async (ctx) => {
     switch (state.step) {
         case 'fio':
             setState(userId, { ...state, step: 'city', fio: text });
-            await ctx.reply('Введите город, в котором вы ищете работу 👇', {
-                attachments: [menuKeyboard],
-            });
+            await ctx.reply('Введите город, в котором вы ищете работу 👇', { attachments: [menuKeyboard] });
             break;
 
         case 'city':
             setState(userId, { ...state, step: 'phone', city: text });
-            await ctx.reply(
-                'Введите ваш номер телефона 👇\n\nВы можете ввести его вручную или отправить с помощью соответствующей кнопки',
-                { attachments: [menuKeyboard] }
-            );
+            await ctx.reply('Введите ваш номер телефона 👇\n\nВы можете ввести его вручную или отправить с помощью соответствующей кнопки', { attachments: [menuKeyboard] });
             break;
 
         case 'phone':
             setState(userId, { ...state, step: 'age', phone: text });
-            await ctx.reply('Введите ваш возраст 👇', {
-                attachments: [menuKeyboard],
-            });
+            await ctx.reply('Введите ваш возраст 👇', { attachments: [menuKeyboard] });
             break;
 
         case 'age':
             setState(userId, { ...state, step: 'email', age: text });
-            await ctx.reply('Введите ваш E-Mail адрес 👇', {
-                attachments: [menuKeyboard],
-            });
+            await ctx.reply('Введите ваш E-Mail адрес 👇', { attachments: [menuKeyboard] });
             break;
 
-        case 'email':
+        case 'email': {
+            const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+            if (!emailValid) {
+                await ctx.reply('❌ Некорректный e-mail. Введите правильный адрес (например: name@mail.ru) 👇', { attachments: [menuKeyboard] });
+                break;
+            }
             setState(userId, { ...state, step: 'citizenship', email: text });
-            await ctx.reply('Какое у вас Гражданство 👇', {
-                attachments: [menuKeyboard],
-            });
+            await ctx.reply('Какое у вас Гражданство 👇', { attachments: [menuKeyboard] });
             break;
+        }
 
         case 'citizenship': {
             const data = { ...state, citizenship: text, step: 'done' };
