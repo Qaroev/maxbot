@@ -209,7 +209,7 @@ async function handleStart(ctx) {
         {
             attachments: [
                 Keyboard.inlineKeyboard([
-                    [Keyboard.button.callback('💠 Самостоятельная регистрация', 'self_register')],
+                    [Keyboard.button.link('💠 Самостоятельная регистрация', 'https://reg.eda.yandex.ru/?advertisement_campaign=forms_for_agents&user_invite_code=1554eafb14ff442faf47d25ea1da4dab&utm_content=blank&utm_campaign=maxbot')],
                     [Keyboard.button.callback('💠 Хочу связаться с менеджером', 'contact_manager')],
                 ]),
             ],
@@ -220,10 +220,6 @@ async function handleStart(ctx) {
 bot.on('bot_started', handleStart);
 
 // ─── Действия ─────────────────────────────────────────────────────────────────
-
-bot.action('self_register', async (ctx) => {
-    await showMenu(ctx, true);
-});
 
 bot.action('contact_manager', async (ctx) => {
     const userId = ctx.user.user_id;
@@ -409,7 +405,7 @@ bot.on('message_created', async (ctx) => {
 
             await new Promise(resolve => setTimeout(resolve, 60000));
 
-            await showMenu(ctx);
+            await handleStart(ctx);
             break;
         }
 
