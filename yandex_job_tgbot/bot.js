@@ -145,6 +145,28 @@ async function sendToBitrix(data, job) {
     return result;
 }
 
+// ─── Вспомогательные функции ──────────────────────────────────────────────────
+
+function extractLink(body, text) {
+    const markup = (body && body.markup) || [];
+    const linkMarkups = markup.filter(m => m.type === 'link' && m.url);
+    const firstLink = linkMarkups[0];
+    if (firstLink) {
+        const btnUrl = firstLink.url;
+        const allSameUrl = linkMarkups.filter(m => m.url === btnUrl);
+        const minFrom = Math.min(...allSameUrl.map(m => m.from));
+        const maxTo = Math.max(...allSameUrl.map(m => m.from + m.length));
+        const btnText = text.substring(minFrom, maxTo).trim() || '👉 Перейти по ссылке';
+        const cleanText = (text.substring(0, minFrom) + text.substring(maxTo)).trim();
+        return { btnUrl, btnText, cleanText };
+    }
+    const urlMatch = text && text.match(/https?:\/\/[^\s]+/);
+    if (urlMatch) {
+        return { btnUrl: urlMatch[0], btnText: '👉 Перейти по ссылке', cleanText: text.replace(urlMatch[0], '').trim() };
+    }
+    return { btnUrl: null, btnText: null, cleanText: text };
+}
+
 // ─── Клавиатуры ───────────────────────────────────────────────────────────────
 
 function getJobKeyboard(userId) {
@@ -177,6 +199,13 @@ const adminKeyboard = Keyboard.inlineKeyboard([
     [Keyboard.button.callback('📊 Статистика', 'admin_stats')],
     [Keyboard.button.callback('📢 Рассылка', 'admin_broadcast')],
     [Keyboard.button.callback('🏠 В меню', 'menu')],
+]);
+
+const broadcastTypeKeyboard = Keyboard.inlineKeyboard([
+    [Keyboard.button.callback('Текст', 'broadcast_text')],
+    [Keyboard.button.callback('Фото + текст', 'broadcast_photo')],
+    [Keyboard.button.callback('Видео + текст', 'broadcast_video')],
+    [Keyboard.button.callback('◀ Назад', 'admin_panel')],
 ]);
 
 // ─── Главное меню ─────────────────────────────────────────────────────────────
@@ -292,10 +321,38 @@ bot.action('admin_stats', async (ctx) => {
 bot.action('admin_broadcast', async (ctx) => {
     const userId = ctx.user.user_id;
     if (userId !== ADMIN_ID) return;
+    setState(userId, { step: 'idle' });
+    await ctx.editMessage({
+        text: 'Выберите, какую именно рассылку вы хотите запустить:',
+        attachments: [broadcastTypeKeyboard],
+    });
+});
+
+bot.action('broadcast_text', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
     setState(userId, { step: 'admin_broadcast_text' });
     await ctx.editMessage({
         text: 'Введите текст для рассылки 👇',
-        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_panel')]])],
+        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_broadcast')]])],
+    });
+});
+
+bot.action('broadcast_photo', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    setState(userId, { step: 'admin_broadcast_photo' });
+    await ctx.reply('Отправьте фото с подписью (или без) 👇', {
+        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_broadcast')]])],
+    });
+});
+
+bot.action('broadcast_video', async (ctx) => {
+    const userId = ctx.user.user_id;
+    if (userId !== ADMIN_ID) return;
+    setState(userId, { step: 'admin_broadcast_video' });
+    await ctx.reply('Отправьте видео с подписью (или без) 👇', {
+        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('◀ Назад', 'admin_broadcast')]])],
     });
 });
 
@@ -307,28 +364,92 @@ bot.on('message_created', async (ctx) => {
     const text = ctx.message && ctx.message.body && ctx.message.body.text;
     const state = getState(userId);
 
-    // Рассылка
+    // Рассылка: текст
     if (state.step === 'admin_broadcast_text' && userId === ADMIN_ID) {
         if (!text) {
             await ctx.reply('Пожалуйста, отправьте текстовое сообщение.');
             return;
         }
         setState(userId, { step: 'idle' });
+        const { btnUrl, btnText, cleanText } = extractLink(ctx.message && ctx.message.body, text);
         let sent = 0, failed = 0;
         for (const uid of users) {
             if (uid === ADMIN_ID) continue;
             try {
-                await bot.api.sendMessageToUser(uid, text);
+                if (btnUrl) {
+                    await bot.api.sendMessageToUser(uid, cleanText, {
+                        attachments: [Keyboard.inlineKeyboard([[Keyboard.button.link(btnText, btnUrl)]])],
+                    });
+                } else {
+                    await bot.api.sendMessageToUser(uid, text);
+                }
                 sent++;
             } catch (e) {
-                console.error('broadcast error:', uid, e.message);
+                console.error('broadcast text error:', uid, e.message);
                 failed++;
             }
         }
-        await ctx.reply(
-            `✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`,
-            { attachments: [adminKeyboard] }
-        );
+        await ctx.reply(`✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`, {
+            attachments: [adminKeyboard],
+        });
+        return;
+    }
+
+    // Рассылка: фото + текст
+    if (state.step === 'admin_broadcast_photo' && userId === ADMIN_ID) {
+        const attachments = (ctx.message && ctx.message.body && ctx.message.body.attachments) || [];
+        const photo = attachments.find(a => a.type === 'image');
+        if (!photo) {
+            await ctx.reply('Пожалуйста, отправьте фото.');
+            return;
+        }
+        setState(userId, { step: 'idle' });
+        const { btnUrl: photoBtnUrl, btnText: photoBtnText, cleanText: photoCleanText } = extractLink(ctx.message && ctx.message.body, text);
+        let sent = 0, failed = 0;
+        for (const uid of users) {
+            if (uid === ADMIN_ID) continue;
+            try {
+                const msgAttachments = [{ type: 'image', payload: { token: photo.payload.token } }];
+                if (photoBtnUrl) msgAttachments.push(Keyboard.inlineKeyboard([[Keyboard.button.link(photoBtnText, photoBtnUrl)]]));
+                await bot.api.sendMessageToUser(uid, photoCleanText || '', { attachments: msgAttachments });
+                sent++;
+            } catch (e) {
+                console.error('broadcast photo error:', uid, e.message);
+                failed++;
+            }
+        }
+        await ctx.reply(`✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`, {
+            attachments: [adminKeyboard],
+        });
+        return;
+    }
+
+    // Рассылка: видео + текст
+    if (state.step === 'admin_broadcast_video' && userId === ADMIN_ID) {
+        const attachments = (ctx.message && ctx.message.body && ctx.message.body.attachments) || [];
+        const video = attachments.find(a => a.type === 'video');
+        if (!video) {
+            await ctx.reply('Пожалуйста, отправьте видео.');
+            return;
+        }
+        setState(userId, { step: 'idle' });
+        const { btnUrl: videoBtnUrl, btnText: videoBtnText, cleanText: videoCleanText } = extractLink(ctx.message && ctx.message.body, text);
+        let sent = 0, failed = 0;
+        for (const uid of users) {
+            if (uid === ADMIN_ID) continue;
+            try {
+                const msgAttachments = [{ type: 'video', payload: { token: video.payload.token } }];
+                if (videoBtnUrl) msgAttachments.push(Keyboard.inlineKeyboard([[Keyboard.button.link(videoBtnText, videoBtnUrl)]]));
+                await bot.api.sendMessageToUser(uid, videoCleanText || '', { attachments: msgAttachments });
+                sent++;
+            } catch (e) {
+                console.error('broadcast video error:', uid, e.message);
+                failed++;
+            }
+        }
+        await ctx.reply(`✅ Рассылка завершена!\n📤 Отправлено: ${sent}\n❌ Ошибок: ${failed}`, {
+            attachments: [adminKeyboard],
+        });
         return;
     }
 
