@@ -199,6 +199,7 @@ async function sendToBitrix(data, job) {
     if (!BITRIX_WEBHOOK) return;
     const url = `${BITRIX_WEBHOOK}/crm.lead.add`;
     const jobTitle = ((job && job.title) || data.selectedJob || '—').replace(/[\u{1F000}-\u{1FFFF}]/gu, '').trim();
+    const regTypeLabel = data.registrationType === 'manager' ? 'С помощью менеджера' : 'Самостоятельная регистрация';
     const fields = {
         TITLE: `${jobTitle} — ${data.fio}`,
         NAME: data.fio,
@@ -208,6 +209,7 @@ async function sendToBitrix(data, job) {
         ADDRESS_CITY: data.city,
         COMMENTS:
             `Источник: Бот Самокат Партнёр\n` +
+            `Способ регистрации: ${regTypeLabel}\n` +
             `Вакансия: ${jobTitle}\n` +
             `ФИО: ${data.fio}\n` +
             `Город: ${data.city}\n` +
@@ -288,6 +290,13 @@ const courierSubKeyboard = Keyboard.inlineKeyboard([
 
 const menuKeyboard = Keyboard.inlineKeyboard([[Keyboard.button.callback('🏠 Меню', 'menu')]]);
 
+const SELF_REG_LINK = 'https://advt.pro/product/ProductId~01HM6EGR30ZE687GB4FX2BN65B!ExecutorId~01H7SDMWST5F9GGWSN2R00MVAQ!UserId~01H7SDMWQCS4PTV7FT83VMJADA!LegacyUserId~3432632?ng_source=prohr&executingType=Standard&executingDays=30&w_source=menu&sort=New';
+
+const regChoiceKeyboard = Keyboard.inlineKeyboard([
+    [Keyboard.button.link('💠 Самостоятельная регистрация', SELF_REG_LINK)],
+    [Keyboard.button.callback('🧑‍💼 С помощью менеджера', 'reg_manager')],
+]);
+
 function jobConfirmKeyboard(jobKey) {
     return Keyboard.inlineKeyboard([
         [Keyboard.button.callback('Согласен, продолжить ▶', `confirm_${jobKey}`)],
@@ -323,6 +332,17 @@ async function showMenu(ctx, edit = false) {
     setState(userId, { step: 'idle' });
     const text =
         '🧑‍💼 Компания-партнёр «Самокат» приглашает в команду!\n\n' +
+        '🎯 Как тебе удобнее оформиться:';
+    if (edit) {
+        await ctx.editMessage({ text, attachments: [regChoiceKeyboard] });
+    } else {
+        await ctx.reply(text, { attachments: [regChoiceKeyboard] });
+    }
+}
+
+async function showJobMenu(ctx, edit = false) {
+    const userId = ctx.user.user_id;
+    const text =
         'У нас открыты несколько интересных вакансий:\n\n' +
         '1️⃣ Курьер-доставщик – доставка заказов на автомобиле, велосипеде или пешком.\n' +
         '2️⃣ Сборщик заказов – комплектация заказов в центре выдачи.\n' +
@@ -362,10 +382,17 @@ bot.action('menu', async (ctx) => {
     await showMenu(ctx, true);
 });
 
+// Выбор способа регистрации
+bot.action('reg_manager', async (ctx) => {
+    const userId = ctx.user.user_id;
+    setState(userId, { step: 'idle', registrationType: 'manager' });
+    await showJobMenu(ctx, true);
+});
+
 // Курьер → показ подменю
 bot.action('job_courier', async (ctx) => {
     const userId = ctx.user.user_id;
-    setState(userId, { step: 'idle' });
+    setState(userId, { ...getState(userId), step: 'idle' });
     await ctx.editMessage({
         text: 'Выберите, какой вид профессии "Курьер" вас больше всего устраивает 👇',
         attachments: [courierSubKeyboard],
@@ -378,13 +405,13 @@ bot.action('back_from_job', async (ctx) => {
     const state = getState(userId);
     const job = JOBS[state.selectedJob];
     if (job && job.parent === 'courier') {
-        setState(userId, { step: 'idle' });
+        setState(userId, { ...state, step: 'idle' });
         await ctx.editMessage({
             text: 'Выберите, какой вид профессии "Курьер" вас больше всего устраивает 👇',
             attachments: [courierSubKeyboard],
         });
     } else {
-        await showMenu(ctx, true);
+        await showJobMenu(ctx, true);
     }
 });
 
@@ -397,13 +424,13 @@ for (const jobKey of ALL_JOB_KEYS) {
 
     bot.action(`job_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
-        setState(userId, { step: 'viewing', selectedJob: jobKey });
+        setState(userId, { ...getState(userId), step: 'viewing', selectedJob: jobKey });
         await ctx.editMessage({ text: job.description, attachments: [jobConfirmKeyboard(jobKey)] });
     });
 
     bot.action(`confirm_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
-        setState(userId, { step: 'consent', selectedJob: jobKey });
+        setState(userId, { ...getState(userId), step: 'consent', selectedJob: jobKey });
         await ctx.editMessage({
             text:
                 '🔒 Ваши данные под защитой\n\n' +
@@ -423,7 +450,7 @@ for (const jobKey of ALL_JOB_KEYS) {
     bot.action(`consent_ok_${jobKey}`, async (ctx) => {
         const userId = ctx.user.user_id;
         await ctx.editMessage({ text: 'Введите ваши Фамилию, Имя и Отчество 👇', attachments: [menuKeyboard] });
-        setState(userId, { step: 'fio', selectedJob: jobKey });
+        setState(userId, { ...getState(userId), step: 'fio', selectedJob: jobKey });
     });
 }
 
