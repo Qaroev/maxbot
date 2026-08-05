@@ -3,7 +3,7 @@ import {Bot, Keyboard} from '@maxhub/max-bot-api';
 import fs from 'fs';
 
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
-const ADMIN_ID = Number("75038254");  //  12564804   203379794. 
+const ADMIN_ID = Number("75038254");  //  12564804   203379794.
 
 const USERS_FILE = './users.json';
 
@@ -151,6 +151,13 @@ function jobConfirmKeyboard(jobKey) {
     ]);
 }
 
+const BUTTON_TEXT_LIMIT = 128;
+
+function truncateButtonText(str) {
+    if (str.length <= BUTTON_TEXT_LIMIT) return str;
+    return str.substring(0, BUTTON_TEXT_LIMIT - 1).trim() + '…';
+}
+
 function extractLink(body, text) {
     const markup = body?.markup || [];
     const linkMarkups = markup.filter(m => m.type === 'link' && m.url);
@@ -160,7 +167,7 @@ function extractLink(body, text) {
         const allSameUrl = linkMarkups.filter(m => m.url === btnUrl);
         const minFrom = Math.min(...allSameUrl.map(m => m.from));
         const maxTo = Math.max(...allSameUrl.map(m => m.from + m.length));
-        const btnText = text.substring(minFrom, maxTo).trim() || '👉 Перейти по ссылке';
+        const btnText = truncateButtonText('👉 Перейти по ссылке');
         const cleanText = (text.substring(0, minFrom) + text.substring(maxTo)).trim();
         return {btnUrl, btnText, cleanText};
     }
