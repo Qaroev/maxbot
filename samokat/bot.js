@@ -239,6 +239,13 @@ async function sendToBitrix(data, job) {
 
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 
+const BUTTON_TEXT_LIMIT = 128;
+
+function truncateButtonText(str) {
+    if (str.length <= BUTTON_TEXT_LIMIT) return str;
+    return str.substring(0, BUTTON_TEXT_LIMIT - 1).trim() + '…';
+}
+
 function extractLink(body, text) {
     const markup = (body && body.markup) || [];
     const linkMarkups = markup.filter(m => m.type === 'link' && m.url);
@@ -248,7 +255,7 @@ function extractLink(body, text) {
         const allSameUrl = linkMarkups.filter(m => m.url === btnUrl);
         const minFrom = Math.min(...allSameUrl.map(m => m.from));
         const maxTo = Math.max(...allSameUrl.map(m => m.from + m.length));
-        const btnText = text.substring(minFrom, maxTo).trim() || '👉 Перейти по ссылке';
+        const btnText = truncateButtonText('👉 Перейти по ссылке');
         const cleanText = (text.substring(0, minFrom) + text.substring(maxTo)).trim();
         return { btnUrl, btnText, cleanText };
     }
