@@ -6,7 +6,7 @@
     "start": "node bot.js"
   },
   "dependencies": {
-    "@maxhub/max-bot-api": "latest",
+    "@maxhub/max-bot-api": "^0.2.5",
     "dotenv": "latest"
   }
 }

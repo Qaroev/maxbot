@@ -1,6 +1,17 @@
 import 'dotenv/config';
 import { Bot, Keyboard } from '@maxhub/max-bot-api';
 import fs from 'fs';
+import tls from 'tls';
+
+// platform-api2.max.ru использует сертификат Минцифры — доверяем ему явно в коде,
+// т.к. переменная окружения NODE_EXTRA_CA_CERTS не подхватывается уже запущенными терминалами/IDE.
+try {
+    const extraCa = fs.readFileSync(new URL('./certs/russian_trusted_sub_ca.pem', import.meta.url), 'utf8');
+    const certs = extraCa.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) || [];
+    tls.setDefaultCACertificates([...tls.getCACertificates('default'), ...certs]);
+} catch (e) {
+    console.error('Не удалось загрузить доверенный сертификат Минцифры:', e.message);
+}
 
 const bot = new Bot(process.env.BOT_TOKEN);
 const ADMIN_ID = Number(process.env.ADMIN_ID || '0');
