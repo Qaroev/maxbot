@@ -398,9 +398,13 @@ async function handleStart(ctx) {
     setState(userId, { step: 'idle' });
 
     if (BANNER_PHOTO_TOKEN) {
-        await ctx.reply('', {
-            attachments: [{ type: 'image', payload: { token: BANNER_PHOTO_TOKEN } }],
-        });
+        try {
+            await ctx.reply('', {
+                attachments: [{ type: 'image', payload: { token: BANNER_PHOTO_TOKEN } }],
+            });
+        } catch (e) {
+            console.error('Banner photo error:', e.message);
+        }
     }
 
     await showMenu(ctx);
