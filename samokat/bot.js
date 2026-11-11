@@ -308,12 +308,20 @@ const courierSubKeyboard = Keyboard.inlineKeyboard([
 
 const menuKeyboard = Keyboard.inlineKeyboard([[Keyboard.button.callback('🏠 Меню', 'menu')]]);
 
-const SELF_REG_LINK = 'https://advt.pro/product/ProductId~01HM6EGR30ZE687GB4FX2BN65B!ExecutorId~01H7SDMWST5F9GGWSN2R00MVAQ!UserId~01H7SDMWQCS4PTV7FT83VMJADA!LegacyUserId~3432632?ng_source=prohr&executingType=Standard&executingDays=30&w_source=menu&sort=New';
+const SAMOKAT_LINK = 'https://clck.ru/3WD4H5';
+const YANDEX_LINK = 'https://ya.cc/t/a2gKSseTBXZTsB';
 
-const regChoiceKeyboard = Keyboard.inlineKeyboard([
-    [Keyboard.button.link('💠 Самостоятельная регистрация', SELF_REG_LINK)],
-    [Keyboard.button.callback('🧑‍💼 С помощью менеджера', 'reg_manager')],
-]);
+function getStartKeyboard(userId) {
+    const rows = [
+        [Keyboard.button.link('🛵 Самокат', SAMOKAT_LINK)],
+        [Keyboard.button.link('🚴 Яндекс', YANDEX_LINK)],
+        [Keyboard.button.link('🔥 Больше вакансий', CHANNEL_LINK)],
+    ];
+    if (userId === ADMIN_ID) {
+        rows.push([Keyboard.button.callback('⚙️ Админ-панель', 'admin_panel')]);
+    }
+    return Keyboard.inlineKeyboard(rows);
+}
 
 function jobConfirmKeyboard(jobKey) {
     return Keyboard.inlineKeyboard([
@@ -349,12 +357,18 @@ async function showMenu(ctx, edit = false) {
     trackUser(userId);
     setState(userId, { step: 'idle' });
     const text =
-        '🧑‍💼 Компания-партнёр «Самокат» приглашает в команду!\n\n' +
-        '🎯 Как тебе удобнее оформиться:';
+        '👋 Привет! Ищешь работу? Поможем начать!\n\n' +
+        'У нас есть проверенные варианты трудоустройства у партнёров и актуальные вакансии в разных сферах.\n\n' +
+        'Выбирай, что тебе подходит:\n\n' +
+        '🛵 Самокат — самостоятельная регистрация и выход на работу.\n\n' +
+        '🚴 Яндекс — вакансии для курьеров.\n\n' +
+        '🔥 Больше вакансий — смотри новые предложения в нашем канале МАХ.\n\n' +
+        'Выбирай направление и начинай зарабатывать!';
+    const keyboard = getStartKeyboard(userId);
     if (edit) {
-        await ctx.editMessage({ text, attachments: [regChoiceKeyboard] });
+        await ctx.editMessage({ text, attachments: [keyboard] });
     } else {
-        await ctx.reply(text, { attachments: [regChoiceKeyboard] });
+        await ctx.reply(text, { attachments: [keyboard] });
     }
 }
 
@@ -392,6 +406,7 @@ async function handleStart(ctx) {
     await showMenu(ctx);
 }
 
+bot.command('start', handleStart);
 bot.on('bot_started', handleStart);
 
 // ─── Действия ─────────────────────────────────────────────────────────────────
@@ -705,6 +720,10 @@ bot.on('message_created', async (ctx) => {
 });
 
 // ─── Запуск ───────────────────────────────────────────────────────────────────
+
+// Команда /start в меню бота — чтобы у пользователя была кнопка запуска
+bot.api.setMyCommands([{ name: 'start', description: 'Запустить бот' }])
+    .catch((e) => console.error('Не удалось установить команды бота:', e.message));
 
 bot.start();
 console.log('✅ Самокат партнёр бот запущен!');
