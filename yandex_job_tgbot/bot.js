@@ -17,6 +17,7 @@ try {
 const bot = new Bot(process.env.BOT_TOKEN);
 const ADMIN_ID = Number(process.env.ADMIN_ID || '0');
 const CHANNEL_LINK = process.env.CHANNEL_LINK || 'https://max.ru/prostorabotaru';
+const BANNER_PHOTO_TOKEN = process.env.BANNER_PHOTO_TOKEN || '';
 
 const USERS_FILE = './users.json';
 
@@ -225,14 +226,7 @@ const broadcastTypeKeyboard = Keyboard.inlineKeyboard([
 async function showMenu(ctx, edit = false) {
     const userId = ctx.user.user_id;
     trackUser(userId);
-    setState(userId, { step: 'idle' });
-    const text = 'У нас открыты несколько интересных вакансий 🔥\n\n🔍 Ищете работу? Выберите вакансию, которая вам подходит! 😊';
-    const keyboard = getJobKeyboard(userId);
-    if (edit) {
-        await ctx.editMessage({ text, attachments: [keyboard] });
-    } else {
-        await ctx.reply(text, { attachments: [keyboard] });
-    }
+    await showStartMenu(ctx, edit);
 }
 
 // ─── /start и bot_started ─────────────────────────────────────────────────────
@@ -241,24 +235,89 @@ async function handleStart(ctx) {
     const userId = ctx.user.user_id;
     trackUser(userId);
     setState(userId, { step: 'idle' });
-    await ctx.reply(
-        '👋 Привет!\n' +
-        'Добро пожаловать в бот для трудоустройства к партнёру ЯндексЕда.\n\n' +
-        '✅ Ежедневные выплаты\n' +
-        '✅ Быстрая регистрация\n\n' +
-        'Выберите удобный для вас способ регистрации:',
-        {
-            attachments: [
-                Keyboard.inlineKeyboard([
-                    [Keyboard.button.link('💠 Самостоятельная регистрация', 'https://reg.eda.yandex.ru/?advertisement_campaign=forms_for_agents&user_invite_code=1554eafb14ff442faf47d25ea1da4dab&utm_content=blank&utm_campaign=maxbot')],
-                    [Keyboard.button.callback('💠 Хочу связаться с менеджером', 'contact_manager')],
-                ]),
-            ],
+
+    if (BANNER_PHOTO_TOKEN) {
+        try {
+            await ctx.reply('', {
+                attachments: [{ type: 'image', payload: { token: BANNER_PHOTO_TOKEN } }],
+            });
+        } catch (e) {
+            console.error('Banner photo error:', e.message);
         }
-    );
+    }
+
+    await showStartMenu(ctx);
 }
 
 bot.on('bot_started', handleStart);
+
+// ─── Стартовое меню и топ-вакансии ───────────────────────────────────────────
+
+const SELF_REG_LINK = 'https://reg.eda.yandex.ru/?advertisement_campaign=forms_for_agents&user_invite_code=1554eafb14ff442faf47d25ea1da4dab&utm_content=blank&utm_campaign=maxbot';
+
+const TOP_JOBS = [
+    {
+        title: '📦 Кладовщик — Яндекс Лавка',
+        url: 'https://forms.yandex.ru/surveys/13772545.48faecb25aa340921af8ef66633ff921ebe9d35e/?campaign=forms_for_agents&referral_code=cukinaarina',
+    },
+    {
+        title: '📦 Кладовщик — Яндекс Маркет',
+        url: 'https://forms.yandex.ru/surveys/13916260.3aadc38b7fad3d17d248c5a9b1a59de1e2635b49/?utm_campaign=yaeda&utm_content=cukinaarina&utm_medium=&utm_term=',
+    },
+    {
+        title: '🚚 Водитель-курьер на грузовом авто',
+        url: 'https://forms.yandex.ru/surveys/13884444.0874de62dbe30ef1af2aa9637228d4e4511f9277/?utm_source=partner&utm_content=cukinaarina',
+    },
+    {
+        title: '⏱ Подработка — смены',
+        url: 'https://forms.yandex.ru/surveys/13481168.7fea6d48affc7f446a50d154a1871c925b2c22be/?utm_source=main_landing&utm_medium=yandexeda&utm_content=cukinaarina&page=1',
+    },
+];
+
+const START_TEXT =
+    '💛 Работа с партнером Яндекса — выбирай своё направление!\n\n' +
+    'Помогаем найти работу и подработку.\n\n' +
+    'Здесь ты можешь самостоятельно зарегистрироваться, выбрать одну из популярных вакансий или посмотреть ещё больше предложений.\n\n' +
+    '👇 Выбирай подходящий вариант!';
+
+function getStartKeyboard(userId) {
+    const rows = [
+        [Keyboard.button.link('💛 Самостоятельная регистрация', SELF_REG_LINK)],
+        [Keyboard.button.callback('🔥 Другие топ-вакансии от Яндекса', 'top_jobs')],
+        [Keyboard.button.link('📢 Множество других вакансий', CHANNEL_LINK)],
+    ];
+    if (userId === ADMIN_ID) {
+        rows.push([Keyboard.button.callback('⚙️ Админ-панель', 'admin_panel')]);
+    }
+    return Keyboard.inlineKeyboard(rows);
+}
+
+const topJobsKeyboard = Keyboard.inlineKeyboard([
+    ...TOP_JOBS.map(job => [Keyboard.button.link(job.title, job.url)]),
+    [Keyboard.button.callback('⬅️ Назад в главное меню', 'start_menu')],
+]);
+
+async function showStartMenu(ctx, edit = false) {
+    const userId = ctx.user.user_id;
+    setState(userId, { step: 'idle' });
+    const keyboard = getStartKeyboard(userId);
+    if (edit) {
+        await ctx.editMessage({ text: START_TEXT, attachments: [keyboard] });
+    } else {
+        await ctx.reply(START_TEXT, { attachments: [keyboard] });
+    }
+}
+
+bot.action('top_jobs', async (ctx) => {
+    await ctx.editMessage({
+        text: '🔥 Популярные вакансии Яндекса\n\nВыбирай вакансию, которая тебе подходит:',
+        attachments: [topJobsKeyboard],
+    });
+});
+
+bot.action('start_menu', async (ctx) => {
+    await showStartMenu(ctx, true);
+});
 
 // ─── Действия ─────────────────────────────────────────────────────────────────
 
