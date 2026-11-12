@@ -6,7 +6,8 @@ const bot = new Bot(process.env.BOT_TOKEN);
 const ADMIN_ID = Number(process.env.ADMIN_ID || '0');
 const CHANNEL_LINK = process.env.CHANNEL_LINK || 'https://max.ru/prostorabotaru';
 const BITRIX_WEBHOOK = process.env.BITRIX_WEBHOOK || '';
-const BANNER_FILE = new URL('./img.png', import.meta.url);
+// Сжатая копия img.png (~110 КБ): тяжёлый PNG на 1.8 МБ не успевает загрузиться в Telegram
+const BANNER_FILE = new URL('./banner.jpg', import.meta.url);
 
 const USERS_FILE = './users.json';
 
@@ -372,8 +373,8 @@ async function showJobMenu(ctx, edit = false) {
 
 // ─── /start ───────────────────────────────────────────────────────────────────
 
-// file_id баннера после первой загрузки — чтобы не грузить img.png каждый раз
-let bannerFileId = null;
+// file_id баннера: из BANNER_FILE_ID в .env или после первой загрузки — чтобы не грузить файл каждый раз
+let bannerFileId = process.env.BANNER_FILE_ID || null;
 
 async function handleStart(ctx) {
     const userId = ctx.from.id;
@@ -384,9 +385,12 @@ async function handleStart(ctx) {
         const msg = await ctx.replyWithPhoto(bannerFileId || new InputFile(BANNER_FILE), {
             reply_markup: { remove_keyboard: true },
         });
-        bannerFileId = msg.photo[msg.photo.length - 1].file_id;
+        if (!bannerFileId) {
+            bannerFileId = msg.photo[msg.photo.length - 1].file_id;
+            console.log('Баннер загружен, BANNER_FILE_ID =', bannerFileId);
+        }
     } catch (e) {
-        console.error('Banner photo error:', e.message);
+        console.error('Banner photo error:', e.message, e.error ? e.error.message || e.error : '');
     }
 
     await showMenu(ctx);
