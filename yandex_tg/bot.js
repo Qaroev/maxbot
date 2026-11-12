@@ -1,13 +1,15 @@
 import 'dotenv/config';
 import { Bot, InlineKeyboard, Keyboard, InputFile, GrammyError } from 'grammy';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const bot = new Bot(process.env.BOT_TOKEN);
 const ADMIN_ID = Number(process.env.ADMIN_ID || '0');
 const CHANNEL_LINK = process.env.CHANNEL_LINK || 'https://max.ru/prostorabotaru';
 const BITRIX_WEBHOOK = process.env.BITRIX_WEBHOOK || '';
 // Сжатая копия img.png (~110 КБ): тяжёлый PNG на 1.8 МБ не успевает загрузиться в Telegram
-const BANNER_FILE = new URL('./banner.jpg', import.meta.url);
+// Путь строкой: URL-объект grammy ошибочно пытается скачать через fetch ("Only absolute URLs are supported")
+const BANNER_FILE = fileURLToPath(new URL('./banner.jpg', import.meta.url));
 
 const USERS_FILE = './users.json';
 
