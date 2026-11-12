@@ -7,6 +7,8 @@ module.exports = {
         { name: 'osago', cwd: __dirname + '/osago_bot', script: 'bot.js' },
         { name: 'samokat', cwd: __dirname + '/samokat', script: 'bot.js' },
         { name: 'yandex_job', cwd: __dirname + '/yandex_job_tgbot', script: 'bot.js' },
+        { name: 'samokat_tg', cwd: __dirname + '/samokat_tg', script: 'bot.js' },
+        { name: 'yandex_tg', cwd: __dirname + '/yandex_tg', script: 'bot.js' },
     ].map(app => ({
         ...app,
         autorestart: true,
