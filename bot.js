@@ -16,6 +16,8 @@ try {
 const bot = new Bot("f9LHodD0cOJa50rkNYVUoRbk1E3EkgeNv74-GdNOCfUen93SNve85THJH3TIE2ciSilD29jQ9QDQOevo-d0i");
 const ADMIN_ID = Number("75038254");  //  12564804   203379794.
 
+const BANNER_PHOTO_TOKEN = 'AYC3lWa5ndxnd-fLLZ4Znu41V7nnekczbxXWEPqdtsrMf2BbX9Gw4oS470NuGZAw8QuVgt3lD0JyUE32z88dApzAvcbJsenAjWzS_fgs8NYmri6DbahKfdyc0QekDw5jukCBCGOhs5It9YUiE2RVbB7gWqpcTxSsP1ezcc7hAAAtyP0LZSIM-jsPWcUoNhPp9WPHiL89E9W5GeCeVl6PUZnR9f_QvnNUQFLyu1f_X5AZkVjH2nbBRrU';
+
 const USERS_FILE = './users.json';
 
 function loadUsers() {
@@ -237,6 +239,33 @@ async function sendToBitrix(data, job) {
     return result;
 }
 
+// Ссылки стартового меню
+const CHANNEL_LINK = 'https://max.ru/prostorabotaru';
+const TOP_COURIER_LINK = 'https://ya.cc/t/I0RpPYlmBY7RWc';
+
+const SELF_REG_JOBS = [
+    {title: '🚗 Автокурьер', url: 'https://clck.ru/3WyG97'},
+    {title: '🚶 Пеший / 🚴 Вело курьер', url: 'https://clck.ru/3WyGEb'},
+    {title: '📦 Сборщик заказов', url: 'https://clck.ru/3WyGLE'},
+];
+
+function getStartKeyboard(userId) {
+    const rows = [
+        [Keyboard.button.callback('💛 Самостоятельная регистрация', 'self_reg')],
+        [Keyboard.button.link('🔥 Топ вакансия курьера', TOP_COURIER_LINK)],
+        [Keyboard.button.link('📢 Множество других вакансий', CHANNEL_LINK)],
+    ];
+    if (userId === ADMIN_ID) {
+        rows.push([Keyboard.button.callback('⚙️ Админ-панель', 'admin_panel')]);
+    }
+    return Keyboard.inlineKeyboard(rows);
+}
+
+const selfRegKeyboard = Keyboard.inlineKeyboard([
+    ...SELF_REG_JOBS.map(job => [Keyboard.button.link(job.title, job.url)]),
+    [Keyboard.button.callback('◀ Назад', 'menu')],
+]);
+
 // Главное меню
 async function showMenu(ctx) {
     const userId = ctx.user.user_id;
@@ -244,16 +273,36 @@ async function showMenu(ctx) {
     setState(userId, {step: 'idle'});
     await ctx.reply(
         'Мы очень рады, что ты хочешь сотрудничать! 🤝\n\n' +
-        '🎯 Давай выберем подходящую вакансию и начнём вместе зарабатывать:\n\n' +
-        '👇 Выбирай, кем хочешь работать:',
-        {attachments: [getJobKeyboard(userId)]}
+        '🎯 Здесь ты можешь самостоятельно зарегистрироваться, выбрать топ-вакансию курьера или посмотреть ещё больше предложений.\n\n' +
+        '👇 Выбирай подходящий вариант!',
+        {attachments: [getStartKeyboard(userId)]}
     );
 }
 
-// /start
-bot.command('start', async (ctx) => {
-    await showMenu(ctx);
+// Самостоятельная регистрация — выбор вакансии
+bot.action('self_reg', async (ctx) => {
+    await ctx.reply(
+        '💛 Самостоятельная регистрация\n\nВыбери вакансию и заполни анкету по ссылке 👇',
+        {attachments: [selfRegKeyboard]}
+    );
 });
+
+// Приветствие с баннером
+async function handleStart(ctx) {
+    if (BANNER_PHOTO_TOKEN) {
+        try {
+            await ctx.reply('', {
+                attachments: [{type: 'image', payload: {token: BANNER_PHOTO_TOKEN}}],
+            });
+        } catch (e) {
+            console.error('Banner photo error:', e.message);
+        }
+    }
+    await showMenu(ctx);
+}
+
+// /start
+bot.command('start', handleStart);
 
 // Кнопка "Меню"
 bot.action('menu', async (ctx) => {
@@ -363,7 +412,7 @@ for (const [jobKey, job] of Object.entries(JOBS)) {
 bot.on('bot_started', async (ctx) => {
     console.log('bot_started');
     console.log('Your ID:', ctx.user.user_id);
-    await showMenu(ctx);
+    await handleStart(ctx);
 });
 
 // Обработка сообщений — шаги анкеты
